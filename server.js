@@ -1,7 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const nodemailer = require("nodemailer"); // <-- NEW IMPORT
 require("dotenv").config();
 
 const User = require("./models/User"); 
@@ -15,15 +14,6 @@ app.use(express.json());
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Atlas Connected!"))
   .catch((err) => console.error("❌ MongoDB Connection Error:", err));
-
-// 📧 Set up the Email Transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 app.get("/", (req, res) => {
   res.send("✅ ALGOVERSE BACKEND IS ALIVE AND WORKING!");
@@ -47,12 +37,12 @@ app.post("/register", async (req, res) => {
 
     await newUser.save();
 
-    // 🚀 Send the Automated Welcome Email
-    const mailOptions = {
-      from: `"AlgoVerse Team" <${process.env.EMAIL_USER}>`,
-      to: email, // Sends to the student's email they typed in the form
+    // 🚀 Send the Automated Welcome Email via BREVO API
+    const emailPayload = {
+      sender: { name: "AlgoVerse Team", email: "kuralarawebflux@gmail.com" },
+      to: [{ email: email, name: name }],
       subject: "🎉 Welcome to AlgoVerse! Your Registration is Confirmed.",
-      html: `
+      htmlContent: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0A0D14; color: #f0f4ff; padding: 30px; border-radius: 15px; border: 1px solid #7c3aed;">
           <h2 style="color: #00D4FF; margin-top: 0;">You're In, ${name.split(' ')[0]}! 🚀</h2>
           <p style="color: #d1d5db; font-size: 16px; line-height: 1.6;">Your seat for the <strong>AlgoVerse AI Hackathon & Workshop</strong> is officially confirmed. We are thrilled to have you join us!</p>
@@ -71,15 +61,26 @@ app.post("/register", async (req, res) => {
       `
     };
 
-    // Fire off the email (we do this asynchronously so the user doesn't have to wait on the UI)
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error("🔥 Error sending email:", error);
+    // Fire off the API request asynchronously
+    fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": process.env.BREVO_API_KEY,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(emailPayload)
+    })
+    .then(async (response) => {
+      if (!response.ok) {
+        console.error("🔥 Brevo API Error:", await response.text());
       } else {
-        console.log("✅ Email sent successfully to:", email);
+        console.log("✅ Welcome email sent successfully via Brevo API to:", email);
       }
-    });
+    })
+    .catch((error) => console.error("🔥 Email fetch failed:", error));
 
+    // Send success response to frontend immediately
     res.status(201).json({ success: true, message: "Registration successful!" });
 
   } catch (error) {
