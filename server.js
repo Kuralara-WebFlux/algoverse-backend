@@ -22,6 +22,18 @@ app.get("/", (req, res) => {
 // Registration API Route
 app.post("/register", async (req, res) => {
   try {
+    // 🛑 1. CHECK THE SEAT LIMIT FIRST
+    const MAX_SEATS = 110;
+    const totalRegistered = await User.countDocuments();
+    
+    if (totalRegistered >= MAX_SEATS) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Registration closed. All 110 seats are fully booked!" 
+      });
+    }
+
+    // 2. Process the input
     const { name, email, phone, department, year, experience_level } = req.body;
 
     // Check if user already exists
