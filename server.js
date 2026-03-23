@@ -19,6 +19,38 @@ app.get("/", (req, res) => {
   res.send("✅ ALGOVERSE BACKEND IS ALIVE AND WORKING!");
 });
 
+// 🔒 SECRET ADMIN ROUTE: Download live WhatsApp CSV
+app.get("/admin/download-whatsapp", async (req, res) => {
+  try {
+    // 1. Check for the secret password in the URL
+    const { key } = req.query;
+    if (key !== process.env.ADMIN_KEY) {
+      return res.status(403).send("❌ Unauthorized: Nice try, hacker!");
+    }
+
+    // 2. Fetch users from database
+    const users = await User.find({}, "name phone");
+    
+    // 3. Build the CSV
+    let csvContent = "Name,Phone\n";
+    users.forEach(user => {
+      // Clean up phone number and add '91' country code
+      let phone = user.phone.toString().replace(/\D/g, '');
+      if (phone.length === 10) phone = "91" + phone;
+      csvContent += `${user.name},${phone}\n`;
+    });
+
+    // 4. Force the browser to download it as a file
+    res.header("Content-Type", "text/csv");
+    res.header("Content-Disposition", "attachment; filename=live_whatsapp_contacts.csv");
+    return res.send(csvContent);
+
+  } catch (error) {
+    console.error("CSV Export Error:", error);
+    res.status(500).send("Error generating file.");
+  }
+});
+
 // Registration API Route
 app.post("/register", async (req, res) => {
   try {
